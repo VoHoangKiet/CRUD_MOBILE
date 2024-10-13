@@ -1,99 +1,154 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
-import { Alert, Button, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import {
+  Alert,
+  Button,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { createStudent, deleteById, getAll } from "../service/StudentService";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { IUser } from "../interface/IUser";
+type RootStackParamList = {
+  Home: undefined;
+  UpdateStudent: { studentId: string };
+};
 
-interface IUser {
-  id: number
-  firstName: string
-  class: string
-}
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 export default function CrudStuddent() {
-
-  const navigator = useNavigation();
-  const list = [
-    { id: 1, firstName: "kiet", class: "A1" },
-    { id: 2, firstName: "kiet2", class: "A2" },
-    { id: 3, firstName: "kiet3", class: "A3" },
-    { id: 4, firstName: "kiet4", class: "A4" },
-  ];
-  const [student, setStudents] = useState<IUser>();
-  const [listStudent, setListStudent] = useState<IUser[]>(list);
+  const navigator = useNavigation<HomeScreenNavigationProp>();
+  const [student, setStudents] = useState<IUser>({
+    id: randomInteger().toString(),
+    firstName: "",
+    class: "",
+  });
+  const [listStudent, setListStudent] = useState<IUser[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   
+  const fetchListStudent = useCallback( async () => {
+    try {
+      const response = await getAll();
+      setListStudent(response);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
+  },[])
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchListStudent();
+    }, [])
+  );
+
   function randomInteger() {
-    return Math.floor(Math.random() * (100000-1+1)) + 1;
+    return Math.floor(Math.random() * (100000 - 1 + 1)) + 1;
   }
   const handleFirstNameChange = (name: string) => {
     setStudents({ ...student, firstName: name } as IUser);
   };
-  
+
   const handleClassChange = (studentClass: string) => {
     setStudents({ ...student, class: studentClass } as IUser);
   };
 
-  const addNewStudent = () => {
+  const addNewStudent = async () => {
     if (!student) {
       setModalVisible(!modalVisible);
       alert("No data require !");
       return;
     }
-    setListStudent([...listStudent ,{id: randomInteger(), firstName: student.firstName, class: student.class}]);
+    await createStudent(student);
+    setListStudent(prevList => [...prevList, student]);
     setModalVisible(!modalVisible);
-  }
+  };
 
-  const deleteStudent = (idDel: number) => {
-  setListStudent(listStudent.filter(student => student.id !== idDel)); 
-  }
-  
-  const updateStudent = () => {
-    navigator.navigate<never>("Update" as never);
-  }
+  const deleteStudent = async (idDel: string) => {
+    try {
+      if (listStudent) {
+        alert("Delete Succesfully")
+        await deleteById(idDel);
+        setListStudent(listStudent.filter((student) => student.id !== idDel));
+      }
+    } catch (error) {
+      console.error('Error deleting student:', error);
+    }
+  };
+
+  const updateStudent = (idUpdate: string) => {
+    navigator.navigate('UpdateStudent', {
+      studentId: idUpdate
+    });
+  };
 
   return (
     <View style={styles.container}>
       <FlatList
         contentContainerStyle={styles.containerFlatList}
         data={listStudent}
-        keyExtractor={item => "" + item.id}
+        keyExtractor={(item) => "" + item.id}
         renderItem={(data) => {
           return (
             <View>
-              <Text style={styles.text}>Name: {data.item.firstName} - Class: {data.item.class}</Text>
-              <Button title="update" color={"green"} onPress={() => updateStudent()}/>
-              <Button title="delete" color={"red"} onPress={() => deleteStudent(data.item.id)}/>
+              <Text style={styles.text}>
+                Name: {data.item.firstName} - Class: {data.item.class}
+              </Text>
+              <Button
+                title="update"
+                color={"green"}
+                onPress={() => updateStudent(data.item.id)}
+              />
+              <Button
+                title="delete"
+                color={"red"}
+                onPress={() => deleteStudent(data.item.id)}
+              />
             </View>
           );
         }}
       />
-      <Button title="Add new" onPress={() => setModalVisible(!modalVisible)}/>
+      <Button title="Add new" onPress={() => setModalVisible(!modalVisible)} />
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => {
-          Alert.alert('Modal has been closed.');
+          Alert.alert("Modal has been closed.");
           setModalVisible(!modalVisible);
-        }}>
+        }}
+      >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
-            <Text style={styles.modalText}>
-              Add New Student
-            </Text>
-            <TextInput style={styles.inputText} placeholder="Student Name" onChangeText={handleFirstNameChange}/>
-            <TextInput style={styles.inputText} placeholder="Student class" onChangeText={handleClassChange}/>
+            <Text style={styles.modalText}>Add New Student</Text>
+            <TextInput
+              style={styles.inputText}
+              placeholder="Student Name"
+              onChangeText={handleFirstNameChange}
+            />
+            <TextInput
+              style={styles.inputText}
+              placeholder="Student class"
+              onChangeText={handleClassChange}
+            />
             <View style={styles.bothButton}>
-            <Pressable
-              style={[styles.button, styles.buttonClose]}
-              onPress={() => setModalVisible(!modalVisible)}>
-              <Text style={styles.textStyle}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.button, styles.buttonClose, { marginLeft: 10 }]}
-              onPress={addNewStudent}>
-              <Text style={styles.textStyle}>Create</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.button, styles.buttonClose]}
+                onPress={() => setModalVisible(!modalVisible)}
+              >
+                <Text style={styles.textStyle}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.button, styles.buttonClose, { marginLeft: 10 }]}
+                onPress={addNewStudent}
+              >
+                <Text style={styles.textStyle}>Create</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -110,30 +165,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   containerFlatList: {
-    flexGrow: 1, 
-    justifyContent: 'center',
+    flexGrow: 1,
+    justifyContent: "center",
   },
-  text : {
+  text: {
     fontSize: 30,
     backgroundColor: "pink",
     borderWidth: 1,
     padding: 30,
     display: "flex",
-    alignItems: "center"
+    alignItems: "center",
   },
   centeredView: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 22,
   },
   modalView: {
     margin: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 20,
     padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -148,28 +203,28 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   buttonOpen: {
-    backgroundColor: '#F194FF',
+    backgroundColor: "#F194FF",
   },
   buttonClose: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   textStyle: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
   },
   modalText: {
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   inputText: {
     borderColor: "green",
     borderWidth: 1,
     width: 200,
     padding: 5,
-    marginBottom: 15
+    marginBottom: 15,
   },
   bothButton: {
     flexDirection: "row",
-  }
+  },
 });
